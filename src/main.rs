@@ -98,7 +98,7 @@ struct MatrixWidget {}
 struct MatrixWidgetState {
     frame: usize,
     grad: GradStops,
-    cset: Vec<char>,
+    cset: Vec<String>,
     rng: rand::prelude::ThreadRng,
     drops: Vec<Drop>,
 }
@@ -109,7 +109,7 @@ impl StatefulWidget for MatrixWidget {
     fn render(self, area: layout::Rect, buf: &mut buffer::Buffer, state: &mut Self::State) {
         state.frame += 1;
 
-        const TAIL: i32 = 10;
+        const TAIL: i32 = 15;
 
         // update the raindrop effect...
         //
@@ -126,10 +126,11 @@ impl StatefulWidget for MatrixWidget {
             for x in 0..area.width {
                 let cell = buf.get_mut(x, y);
 
-                // we can now set the symbol, and the colour...
+                // we can now set the symbol, using perline noise,
+                // we update some of the characters at a lower
+                // frequency...
                 //
-                let c = state.cset.choose(&mut state.rng).unwrap();
-                cell.symbol = String::from(*c);
+                cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
 
                 // find proximjity to raindrop...
                 //
@@ -174,7 +175,11 @@ fn main() -> std::io::Result<()> {
     // create the character set that we are going to
     // use for the character-swap-fx.jk
     //
-    let cset = "aeiou23579=#$ʓʊΔΦДШՆտ".chars().collect::<Vec<char>>();
+    let cset = "aeiou23579=#$ʓʊΔΦДШՆտ"
+        .chars()
+        .into_iter()
+        .map(|c| c.to_string())
+        .collect::<Vec<String>>();
 
     // create the initial raindrops above the top of
     // the screen so that we start with a blank screen,
@@ -182,9 +187,10 @@ fn main() -> std::io::Result<()> {
     //
     let mut drops = Vec::new();
     for _ in 0..terminal.size()?.width {
+        let r = rand::RngCore::next_u32(&mut rng) as usize;
         let d = Drop {
-            pos: -((rand::RngCore::next_u32(&mut rng) % terminal.size()?.height as u32 * 2) as i32),
-            speed: 1,
+            pos: -((r % terminal.size()?.height as usize * 2) as i32),
+            speed: 1 + (r % 2),
         };
         drops.push(d);
     }
