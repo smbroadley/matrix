@@ -79,6 +79,7 @@ impl MatrixWidget {
             for x in 0..area.width {
                 let cell = buf.get_mut(x, y);
                 cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
+                cell.fg = state.grad[0].1.into();
             }
         }
 
