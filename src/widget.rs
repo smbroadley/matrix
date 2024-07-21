@@ -1,7 +1,6 @@
-use crate::GradStops;
-use crate::{gradient::SampleLinear, RGBf32};
+use crate::{GradStops, RGBf32, SampleLinear};
+use rand::seq::SliceRandom;
 use rand::Rng;
-use rand::{seq::SliceRandom, RngCore};
 use tui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
 
 impl From<RGBf32> for tui::style::Color {
@@ -14,7 +13,7 @@ impl From<RGBf32> for tui::style::Color {
     }
 }
 
-pub struct Drop {
+struct Raindrop {
     pub pos: i32,
     pub speed: u16,
 }
@@ -22,7 +21,7 @@ pub struct Drop {
 pub struct MatrixWidget {}
 pub struct MatrixWidgetState {
     frame: u16,
-    drops: Vec<Drop>,
+    drops: Vec<Raindrop>,
     area: Rect,
     tail: u16,
     grad: GradStops,
@@ -63,7 +62,7 @@ impl MatrixWidget {
 
         for _ in 0..area.width {
             let r = rand::RngCore::next_u32(&mut state.rng) as u16;
-            let d = Drop {
+            let d = Raindrop {
                 pos: -((r % (area.height * 2 + state.tail)) as i32),
                 speed: 1 + (r % 3),
             };
@@ -115,53 +114,61 @@ impl StatefulWidget for MatrixWidget {
 
         for y in 0..area.height {
             for x in 0..area.width {
-                let p = state.drops.get(x as usize).unwrap().pos;
+                let drop = &state.drops[x as usize];
 
-                // should we update the symbol?
+                // update anything?
                 //
-                let is_head = y as i32 == p;
-                let is_rand = state.rng.gen_bool(0.05);
-
-                if is_head || is_rand {
-                    // swap with another character in the
-                    // buffer to avoid allocations
+                if state.frame % drop.speed == 0 {
+                    // should we update the symbol?
                     //
-                    let mut temp = String::new(); // (no alloc)
+                    let is_head = y as i32 == drop.pos;
+                    let is_rand = state.rng.gen_bool(0.05);
 
-                    // x,y <==> temp
-                    {
-                        let cell = buf.get_mut(x, y);
-                        std::mem::swap(&mut cell.symbol, &mut temp);
-                    }
+                    if is_head || is_rand {
+                        // swap with another character in the
+                        // buffer to avoid allocations
+                        //
+                        let mut temp = String::new(); // (no alloc)
 
-                    // temp <==> rx, ry
-                    {
-                        let rx = state.rng.gen_range(0..area.width);
-                        let ry = state.rng.gen_range(0..area.height);
+                        // x,y <==> temp
+                        {
+                            let cell = buf.get_mut(x, y);
+                            std::mem::swap(&mut cell.symbol, &mut temp);
+                        }
 
-                        if rx != x || ry != y {
-                            let cell = buf.get_mut(rx, ry);
+                        // temp <==> rx, ry
+                        {
+                            let rx = state.rng.gen_range(0..area.width);
+                            let ry = state.rng.gen_range(0..area.height);
+
+                            if rx != x || ry != y {
+                                let cell = buf.get_mut(rx, ry);
+                                std::mem::swap(&mut cell.symbol, &mut temp);
+                            }
+                        }
+
+                        // x,y <==> temp
+                        {
+                            let cell = buf.get_mut(x, y);
                             std::mem::swap(&mut cell.symbol, &mut temp);
                         }
                     }
 
-                    // x,y <==> temp
-                    {
-                        let cell = buf.get_mut(x, y);
-                        std::mem::swap(&mut cell.symbol, &mut temp);
+                    // calculate rain gradient colour
+                    //
+                    let cell = buf.get_mut(x, y);
+
+                    let r = ((drop.pos - state.tail as i32) as f32)..(drop.pos as f32);
+
+                    if let Some(v) = r.sample(y as f32) {
+                        // get a blended colour from the gradient
+                        //
+                        cell.fg = state.grad.sample(v).into();
+                    } else {
+                        // use the first gradient stop colour
+                        //
+                        cell.fg = state.grad[0].1.into();
                     }
-                }
-
-                // calculate rain gradient colour
-                //
-                let cell = buf.get_mut(x, y);
-
-                let r = ((p - state.tail as i32) as f32)..(p as f32);
-
-                if let Some(v) = r.sample(y as f32) {
-                    cell.fg = state.grad.sample(v).into();
-                } else {
-                    cell.fg = state.grad[0].1.into();
                 }
             }
         }
