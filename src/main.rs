@@ -10,7 +10,17 @@ use crate::gradient::*;
 use crate::rgbf32::*;
 use crate::widget::*;
 
+// tracking allocator (used in 'Debug' target)
+//
+use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
+use std::alloc::System;
+
+#[cfg_attr(Debug, global_allocator)]
+static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
+
 fn main() -> std::io::Result<()> {
+    let reg = Region::new(&GLOBAL);
+
     let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -26,15 +36,19 @@ fn main() -> std::io::Result<()> {
     let mut state = MatrixWidgetState::new(20, "8=ｱｲｳｷｸｵﾔﾃﾂﾕ", grad);
 
     loop {
-        if poll(Duration::from_millis(60))? {
-            break;
-        }
-
         let mut f = terminal.get_frame();
 
         f.render_stateful_widget(MatrixWidget {}, f.size(), &mut state);
 
         terminal.flush()?;
+
+        if poll(Duration::from_millis(60))? {
+            break;
+        }
+    }
+
+    if cfg!(Debug) {
+        println!("\nStats at exit: {:#?}", reg.change());
     }
 
     Ok(())

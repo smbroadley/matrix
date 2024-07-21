@@ -1,5 +1,6 @@
 use crate::GradStops;
 use crate::{gradient::SampleLinear, RGBf32};
+use rand::Rng;
 use rand::{seq::SliceRandom, RngCore};
 use tui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
 
@@ -22,7 +23,7 @@ pub struct MatrixWidget {}
 pub struct MatrixWidgetState {
     frame: u16,
     drops: Vec<Drop>,
-    width: u16,
+    area: Rect,
     tail: u16,
     grad: GradStops,
     cset: Vec<String>,
@@ -42,7 +43,7 @@ impl MatrixWidgetState {
 
         Self {
             frame: 0,
-            width: 0,
+            area: Rect::new(0, 0, 0, 0),
             drops: Vec::new(),
             tail,
             grad,
@@ -52,29 +53,56 @@ impl MatrixWidgetState {
     }
 }
 
+impl MatrixWidget {
+    fn init(&self, area: Rect, buf: &mut Buffer, state: &mut MatrixWidgetState) {
+        // initialize raindrops with random starting location
+        // above the visible area, and with a random movement
+        // speed
+        //
+        let mut drops = Vec::new();
+
+        for _ in 0..area.width {
+            let r = rand::RngCore::next_u32(&mut state.rng) as u16;
+            let d = Drop {
+                pos: -((r % (area.height * 2 + state.tail)) as i32),
+                speed: 1 + (r % 3),
+            };
+            drops.push(d);
+        }
+
+        state.drops = drops;
+
+        // initialize buffer with random characters; we do this
+        // so that we avoid allocations when randomizing the
+        // screen contents
+        //
+        for y in 0..area.height {
+            for x in 0..area.width {
+                let cell = buf.get_mut(x, y);
+                cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
+            }
+        }
+
+        // indicate successful init for this area
+        //
+        state.area = area;
+    }
+}
+
 impl StatefulWidget for MatrixWidget {
     type State = MatrixWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        if state.width != area.width {
-            let mut drops = Vec::new();
-            for _ in 0..area.width {
-                let r = rand::RngCore::next_u32(&mut state.rng) as u16;
-                let d = Drop {
-                    pos: -((r % (area.height * 2 + state.tail)) as i32),
-                    speed: 1 + (r % 3),
-                };
-                drops.push(d);
-            }
-            state.drops = drops;
-            state.width = area.width;
+        if state.area != area {
+            self.init(area, buf, state);
         }
 
-        // update the frame counter (we wrap at 16 frames)
+        // update the frame counter (we wrap at factorial(RAINDROP_MAX_SPEED) frame-count)
+        //
         state.frame += 1;
-        state.frame %= 16;
+        state.frame %= 3 * 2 * 1; // max speed factorial
 
-        // update the raindrop effect...
+        // update the raindrops
         //
         for d in state.drops.iter_mut() {
             if state.frame % d.speed == 0 {
@@ -87,20 +115,47 @@ impl StatefulWidget for MatrixWidget {
 
         for y in 0..area.height {
             for x in 0..area.width {
-                let cell = buf.get_mut(x, y);
                 let p = state.drops.get(x as usize).unwrap().pos;
 
                 // should we update the symbol?
                 //
                 let is_head = y as i32 == p;
-                let is_rand = state.rng.next_u32() % 16 == 0;
+                let is_rand = state.rng.gen_bool(0.05);
 
                 if is_head || is_rand {
-                    cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
+                    // swap with another character in the
+                    // buffer to avoid allocations
+                    //
+                    let mut temp = String::new(); // (no alloc)
+
+                    // x,y <==> temp
+                    {
+                        let cell = buf.get_mut(x, y);
+                        std::mem::swap(&mut cell.symbol, &mut temp);
+                    }
+
+                    // temp <==> rx, ry
+                    {
+                        let rx = state.rng.gen_range(0..area.width);
+                        let ry = state.rng.gen_range(0..area.height);
+
+                        if rx != x || ry != y {
+                            let cell = buf.get_mut(rx, ry);
+                            std::mem::swap(&mut cell.symbol, &mut temp);
+                        }
+                    }
+
+                    // x,y <==> temp
+                    {
+                        let cell = buf.get_mut(x, y);
+                        std::mem::swap(&mut cell.symbol, &mut temp);
+                    }
                 }
 
-                // calculate raindrop gradient colour...
+                // calculate rain gradient colour
                 //
+                let cell = buf.get_mut(x, y);
+
                 let r = ((p - state.tail as i32) as f32)..(p as f32);
 
                 if let Some(v) = r.sample(y as f32) {
