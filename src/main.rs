@@ -30,10 +30,10 @@ fn main() -> std::io::Result<()> {
     let grad: GradStops = vec![
         (0.0, RGBf32::BLACK),
         (0.8, RGBf32::GREEN),
-        (1.0, RGBf32::WHITE),
+        (1.0, RGBf32::new(0.8, 1.0, 0.8)),
     ];
 
-    let mut state = MatrixWidgetState::new(20, "8=ｱｲｳｷｸｵﾔﾃﾂﾕ", grad);
+    let mut state = MatrixWidgetState::new(20, "STEPHENBROADLEY249=ｱｲｳｷｸｵﾔﾃﾂﾕﾐﾑﾒﾓﾕﾖﾗﾘﾛﾜﾄｿｽｻ", grad);
 
     loop {
         let mut f = terminal.get_frame();
@@ -60,17 +60,18 @@ mod tests {
 
     fn create_grad() -> GradStops {
         vec![
-            (0.0, RGBf32::new(0.0, 0.0, 0.0)),
-            (0.5, RGBf32::new(0.0, 1.0, 0.0)),
-            (1.0, RGBf32::new(1.0, 1.0, 1.0)),
+            (0.0, RGBf32::RED),
+            (0.5, RGBf32::GREEN),
+            (1.0, RGBf32::BLUE),
         ]
     }
 
     #[test]
     fn test_grad() {
         let grad = create_grad();
-        let white = RGBf32::new(1.0, 1.0, 1.0);
 
-        assert_eq!(grad.sample(1.0), white);
+        assert_eq!(grad.sample(0.0), RGBf32::RED);
+        assert_eq!(grad.sample(0.5), RGBf32::GREEN);
+        assert_eq!(grad.sample(1.0), RGBf32::BLUE);
     }
 }

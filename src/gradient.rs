@@ -39,6 +39,13 @@ impl SampleLinear for GradStops {
                 //
                 let i0 = i.saturating_sub(1);
 
+                // if we are sampling from the same index,
+                // then no need to lerp the colour values
+                //
+                if i == i0 {
+                    return c;
+                }
+
                 let (s0, c0) = self[i0];
                 let (s1, c1) = (v, c);
 

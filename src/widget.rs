@@ -161,7 +161,7 @@ impl StatefulWidget for MatrixWidget {
                 if let Some(v) = r.sample(y as f32) {
                     cell.fg = state.grad.sample(v).into();
                 } else {
-                    cell.fg = tui::style::Color::Black;
+                    cell.fg = state.grad[0].1.into();
                 }
             }
         }
