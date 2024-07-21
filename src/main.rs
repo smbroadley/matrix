@@ -1,5 +1,5 @@
 use crossterm::event::poll;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, RngCore};
 use std::time::Duration;
 use tui::{backend::CrosstermBackend, widgets::StatefulWidget, *};
 
@@ -97,10 +97,11 @@ impl SampleLinear for GradStops {
 struct MatrixWidget {}
 struct MatrixWidgetState {
     frame: usize,
+    drops: Vec<Drop>,
+    tail: i32,
     grad: GradStops,
     cset: Vec<String>,
     rng: rand::prelude::ThreadRng,
-    drops: Vec<Drop>,
 }
 
 impl StatefulWidget for MatrixWidget {
@@ -109,15 +110,13 @@ impl StatefulWidget for MatrixWidget {
     fn render(self, area: layout::Rect, buf: &mut buffer::Buffer, state: &mut Self::State) {
         state.frame += 1;
 
-        const TAIL: i32 = 15;
-
         // update the raindrop effect...
         //
         for d in state.drops.iter_mut() {
             if state.frame % d.speed == 0 {
                 d.pos += 1;
-                if d.pos > area.height as i32 + TAIL as i32 {
-                    d.pos = 0
+                if d.pos > area.height as i32 + state.tail as i32 {
+                    d.pos -= area.height as i32 * 2;
                 }
             }
         }
@@ -125,17 +124,20 @@ impl StatefulWidget for MatrixWidget {
         for y in 0..area.height {
             for x in 0..area.width {
                 let cell = buf.get_mut(x, y);
-
-                // we can now set the symbol, using perline noise,
-                // we update some of the characters at a lower
-                // frequency...
-                //
-                cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
-
-                // find proximjity to raindrop...
-                //
                 let p = state.drops.get(x as usize).unwrap().pos;
-                let r = (p - TAIL) as f32..p as f32;
+
+                // should we update the symbol?
+                //
+                let is_head = y as i32 == p;
+                let is_rand = state.rng.next_u32() % 16 == 0;
+
+                if is_head || is_rand {
+                    cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
+                }
+
+                // calculate proximity to raindrop...
+                //
+                let r = ((p - state.tail) as f32)..(p as f32);
 
                 if let Some(v) = r.sample(y as f32) {
                     cell.fg = state.grad.sample(v).into();
@@ -168,14 +170,14 @@ fn main() -> std::io::Result<()> {
     //
     let grad: GradStops = vec![
         (0.0, RGBf32::new(0.0, 0.0, 0.0)),
-        (0.9, RGBf32::new(0.0, 1.0, 0.0)),
+        (0.8, RGBf32::new(0.0, 1.0, 0.0)),
         (1.0, RGBf32::new(1.0, 1.0, 1.0)),
     ];
 
     // create the character set that we are going to
     // use for the character-swap-fx.jk
     //
-    let cset = "aeiou23579=#$ʓʊΔΦДШՆտ"
+    let cset = "8=ｱｲｳｷｸｵﾔﾃﾂﾕ"
         .chars()
         .into_iter()
         .map(|c| c.to_string())
@@ -189,8 +191,8 @@ fn main() -> std::io::Result<()> {
     for _ in 0..terminal.size()?.width {
         let r = rand::RngCore::next_u32(&mut rng) as usize;
         let d = Drop {
-            pos: -((r % terminal.size()?.height as usize * 2) as i32),
-            speed: 1 + (r % 2),
+            pos: -((r % (terminal.size()?.height as usize * 2 + 15)) as i32),
+            speed: 1 + (r % 3),
         };
         drops.push(d);
     }
@@ -200,6 +202,7 @@ fn main() -> std::io::Result<()> {
     let mut state = MatrixWidgetState {
         frame: 0,
         drops,
+        tail: 15,
         grad,
         cset,
         rng,
@@ -208,7 +211,7 @@ fn main() -> std::io::Result<()> {
     // run the effect until a key is pressed
     //
     loop {
-        if poll(Duration::from_millis(100))? {
+        if poll(Duration::from_millis(60))? {
             break;
         }
 
