@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
 
     let grad: GradStops = vec![
         (0.0, RGBf32::BLACK),
-        (0.8, RGBf32::GREEN),
+        (0.8, RGBf32::new(0.0, 1.0, 0.4)),
         (1.0, RGBf32::new(0.8, 1.0, 0.8)),
     ];
 
