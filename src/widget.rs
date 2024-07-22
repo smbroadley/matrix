@@ -117,7 +117,7 @@ impl StatefulWidget for MatrixWidget {
             if state.frame % d.speed == 0 {
                 d.pos += 1;
                 if d.pos > area.height as i32 + state.tail as i32 {
-                    d.pos -= area.height as i32 * 2;
+                    d.pos -= area.height as i32 + state.tail as i32;
                 }
             }
         }
