@@ -13,6 +13,7 @@ impl From<RGBf32> for tui::style::Color {
     }
 }
 
+#[derive(Copy, Clone)]
 struct Raindrop {
     pub pos: i32,
     pub speed: u16,
@@ -25,28 +26,19 @@ pub struct MatrixWidgetState {
     area: Rect,
     tail: u16,
     grad: GradStops,
-    cset: Vec<String>,
+    chars: String,
     rng: rand::prelude::ThreadRng,
 }
 
 impl MatrixWidgetState {
-    pub fn new(tail: u16, chars: &str, grad: GradStops) -> Self {
-        // create the character set that we are going to
-        // use for the character-swap-fx.jk
-        //
-        let cset = chars
-            .chars()
-            .into_iter()
-            .map(|c| c.to_string())
-            .collect::<Vec<String>>();
-
+    pub fn new(tail: u16, chars: impl ToString, grad: GradStops) -> Self {
         Self {
             frame: 0,
             area: Rect::new(0, 0, 0, 0),
             drops: Vec::new(),
             tail,
             grad,
-            cset,
+            chars: chars.to_string(),
             rng: rand::thread_rng(),
         }
     }
@@ -61,10 +53,9 @@ impl MatrixWidget {
         let mut drops = Vec::new();
 
         for _ in 0..area.width {
-            let r = rand::RngCore::next_u32(&mut state.rng) as u16;
             let d = Raindrop {
-                pos: -((r % (area.height * 2 + state.tail)) as i32),
-                speed: 1 + (r % 3),
+                pos: -(state.rng.gen_range(0..area.height + state.tail) as i32),
+                speed: state.rng.gen_range(1..=4),
             };
             drops.push(d);
         }
@@ -72,18 +63,26 @@ impl MatrixWidget {
         state.drops = drops;
 
         // initialize buffer with random characters; we do this
-        // so that we avoid allocations when randomizing the
-        // screen contents
+        // so that we avoid allocations by swapping charaters
+        // that already exist on the screen using std::mem::swap
         //
+        let cset = state
+            .chars
+            .chars()
+            .into_iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<String>>();
+
         for y in 0..area.height {
             for x in 0..area.width {
                 let cell = buf.get_mut(x, y);
-                cell.symbol = state.cset.choose(&mut state.rng).unwrap().clone();
+                cell.symbol = cset.choose(&mut state.rng).unwrap().clone();
                 cell.fg = state.grad[0].1.into();
             }
         }
 
-        // indicate successful init for this area
+        // update our initialized area; if we detect this
+        // changes, then we re-initialize!
         //
         state.area = area;
     }
@@ -115,7 +114,7 @@ impl StatefulWidget for MatrixWidget {
 
         for y in 0..area.height {
             for x in 0..area.width {
-                let drop = &state.drops[x as usize];
+                let drop = state.drops[x as usize];
 
                 // update anything?
                 //
@@ -126,33 +125,7 @@ impl StatefulWidget for MatrixWidget {
                     let is_rand = state.rng.gen_bool(0.05);
 
                     if is_head || is_rand {
-                        // swap with another character in the
-                        // buffer to avoid allocations
-                        //
-                        let mut temp = String::new(); // (no alloc)
-
-                        // x,y <==> temp
-                        {
-                            let cell = buf.get_mut(x, y);
-                            std::mem::swap(&mut cell.symbol, &mut temp);
-                        }
-
-                        // temp <==> rx, ry
-                        {
-                            let rx = state.rng.gen_range(0..area.width);
-                            let ry = state.rng.gen_range(0..area.height);
-
-                            if rx != x || ry != y {
-                                let cell = buf.get_mut(rx, ry);
-                                std::mem::swap(&mut cell.symbol, &mut temp);
-                            }
-                        }
-
-                        // x,y <==> temp
-                        {
-                            let cell = buf.get_mut(x, y);
-                            std::mem::swap(&mut cell.symbol, &mut temp);
-                        }
+                        random_swap_cell_symbol(buf, x, y, state, area);
                     }
 
                     // calculate rain gradient colour
@@ -173,5 +146,42 @@ impl StatefulWidget for MatrixWidget {
                 }
             }
         }
+    }
+}
+
+fn random_swap_cell_symbol(
+    buf: &mut Buffer,
+    x: u16,
+    y: u16,
+    state: &mut MatrixWidgetState,
+    area: Rect,
+) {
+    // swap with another character in the
+    // buffer to avoid allocations
+    //
+    let mut temp = String::new();
+    // (no alloc)
+
+    // x,y <==> temp
+    {
+        let cell = buf.get_mut(x, y);
+        std::mem::swap(&mut cell.symbol, &mut temp);
+    }
+
+    // temp <==> rx, ry
+    {
+        let rx = state.rng.gen_range(0..area.width);
+        let ry = state.rng.gen_range(0..area.height);
+
+        if rx != x || ry != y {
+            let cell = buf.get_mut(rx, ry);
+            std::mem::swap(&mut cell.symbol, &mut temp);
+        }
+    }
+
+    // x,y <==> temp
+    {
+        let cell = buf.get_mut(x, y);
+        std::mem::swap(&mut cell.symbol, &mut temp);
     }
 }
