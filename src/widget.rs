@@ -1,7 +1,11 @@
 use crate::{GradStops, RGBf32, SampleLinear};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use tui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+use tui::{
+    buffer::{Buffer, Cell},
+    layout::Rect,
+    widgets::StatefulWidget,
+};
 
 impl From<RGBf32> for tui::style::Color {
     fn from(value: RGBf32) -> Self {
@@ -156,32 +160,24 @@ fn random_swap_cell_symbol(
     state: &mut MatrixWidgetState,
     area: Rect,
 ) {
-    // swap with another character in the
-    // buffer to avoid allocations
-    //
-    let mut temp = String::new();
-    // (no alloc)
+    let rx = state.rng.gen_range(area.x..area.width);
+    let ry = state.rng.gen_range(area.y..area.height);
 
-    // x,y <==> temp
-    {
-        let cell = buf.get_mut(x, y);
-        std::mem::swap(&mut cell.symbol, &mut temp);
-    }
+    if rx != x || ry != y {
+        let mut i0 = buf.index_of(x, y);
+        let mut i1 = buf.index_of(rx, ry);
 
-    // temp <==> rx, ry
-    {
-        let rx = state.rng.gen_range(area.x..area.width);
-        let ry = state.rng.gen_range(area.y..area.height);
-
-        if rx != x || ry != y {
-            let cell = buf.get_mut(rx, ry);
-            std::mem::swap(&mut cell.symbol, &mut temp);
+        // swap indexes so lower is used as split point
+        //
+        if i0 > i1 {
+            (i0, i1) = (i1, i0);
         }
-    }
 
-    // x,y <==> temp
-    {
-        let cell = buf.get_mut(x, y);
-        std::mem::swap(&mut cell.symbol, &mut temp);
+        let (s0, s1) = buf.content.as_mut_slice().split_at_mut(i0 + 1);
+
+        let c0 = &mut s0[i0];
+        let c1 = &mut s1[i1 - i0 - 1];
+
+        std::mem::swap(&mut c0.symbol, &mut c1.symbol);
     }
 }
