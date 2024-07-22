@@ -27,18 +27,19 @@ fn main() -> std::io::Result<()> {
 
     terminal.hide_cursor()?;
 
-    let grad: GradStops = vec![
+    let gradient: GradStops = vec![
         (0.0, RGBf32::BLACK),
         (0.8, RGBf32::new(0.0, 1.0, 0.4)),
         (1.0, RGBf32::new(0.8, 1.0, 0.8)),
     ];
 
-    let mut state = MatrixWidgetState::new(20, "STEPHENBROADLEY249=ｱｲｳｷｸｵﾔﾃﾂﾕﾐﾑﾒﾓﾕﾖﾗﾘﾛﾜﾄｿｽｻ", grad);
+    let mut state =
+        MatrixWidgetState::new(20, "STEPHENBROADLEY249=ｱｲｳｷｸｵﾔﾃﾂﾕﾐﾑﾒﾓﾕﾖﾗﾘﾛﾜﾄｿｽｻ", gradient);
 
     loop {
-        let mut f = terminal.get_frame();
+        let mut frame = terminal.get_frame();
 
-        f.render_stateful_widget(MatrixWidget {}, f.size(), &mut state);
+        frame.render_stateful_widget(MatrixWidget {}, frame.size(), &mut state);
 
         terminal.flush()?;
 
@@ -52,26 +53,4 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn create_grad() -> GradStops {
-        vec![
-            (0.0, RGBf32::RED),
-            (0.5, RGBf32::GREEN),
-            (1.0, RGBf32::BLUE),
-        ]
-    }
-
-    #[test]
-    fn test_grad() {
-        let grad = create_grad();
-
-        assert_eq!(grad.sample(0.0), RGBf32::RED);
-        assert_eq!(grad.sample(0.5), RGBf32::GREEN);
-        assert_eq!(grad.sample(1.0), RGBf32::BLUE);
-    }
 }

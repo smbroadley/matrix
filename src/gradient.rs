@@ -64,3 +64,25 @@ impl SampleLinear for GradStops {
         return self[stops - 1].1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_grad() -> GradStops {
+        vec![
+            (0.0, RGBf32::RED),
+            (0.5, RGBf32::GREEN),
+            (1.0, RGBf32::BLUE),
+        ]
+    }
+
+    #[test]
+    fn test_grad() {
+        let grad = create_grad();
+
+        assert_eq!(grad.sample(0.0), RGBf32::RED);
+        assert_eq!(grad.sample(0.5), RGBf32::GREEN);
+        assert_eq!(grad.sample(1.0), RGBf32::BLUE);
+    }
+}

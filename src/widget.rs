@@ -73,8 +73,8 @@ impl MatrixWidget {
             .map(|c| c.to_string())
             .collect::<Vec<String>>();
 
-        for y in 0..area.height {
-            for x in 0..area.width {
+        for y in area.y..area.height {
+            for x in area.x..area.width {
                 let cell = buf.get_mut(x, y);
                 cell.symbol = cset.choose(&mut state.rng).unwrap().clone();
                 cell.fg = state.grad[0].1.into();
@@ -112,8 +112,8 @@ impl StatefulWidget for MatrixWidget {
             }
         }
 
-        for y in 0..area.height {
-            for x in 0..area.width {
+        for y in area.y..area.height {
+            for x in area.x..area.width {
                 let drop = state.drops[x as usize];
 
                 // update anything?
@@ -170,8 +170,8 @@ fn random_swap_cell_symbol(
 
     // temp <==> rx, ry
     {
-        let rx = state.rng.gen_range(0..area.width);
-        let ry = state.rng.gen_range(0..area.height);
+        let rx = state.rng.gen_range(area.x..area.width);
+        let ry = state.rng.gen_range(area.y..area.height);
 
         if rx != x || ry != y {
             let cell = buf.get_mut(rx, ry);
