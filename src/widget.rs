@@ -1,11 +1,9 @@
 use crate::{GradStops, RGBf32, SampleLinear};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use tui::{
-    buffer::{Buffer, Cell},
-    layout::Rect,
-    widgets::StatefulWidget,
-};
+use tui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+
+const MAX_DROP_SPEED: u16 = 4;
 
 impl From<RGBf32> for tui::style::Color {
     fn from(value: RGBf32) -> Self {
@@ -59,7 +57,7 @@ impl MatrixWidget {
         for _ in 0..area.width {
             let d = Raindrop {
                 pos: -(state.rng.gen_range(0..area.height + state.tail) as i32),
-                speed: state.rng.gen_range(1..=4),
+                speed: state.rng.gen_range(1..=MAX_DROP_SPEED),
             };
             drops.push(d);
         }
@@ -92,6 +90,14 @@ impl MatrixWidget {
     }
 }
 
+const fn factorial(n: u16) -> u16 {
+    if n > 1 {
+        n * factorial(n - 1)
+    } else {
+        n
+    }
+}
+
 impl StatefulWidget for MatrixWidget {
     type State = MatrixWidgetState;
 
@@ -103,7 +109,7 @@ impl StatefulWidget for MatrixWidget {
         // update the frame counter (we wrap at factorial(RAINDROP_MAX_SPEED) frame-count)
         //
         state.frame += 1;
-        state.frame %= 3 * 2 * 1; // max speed factorial
+        state.frame %= factorial(MAX_DROP_SPEED);
 
         // update the raindrops
         //
